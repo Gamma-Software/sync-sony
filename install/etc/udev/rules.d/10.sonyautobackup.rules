@@ -1,0 +1,1 @@
+ENV{DEVTYPE}=="usb_device", SUBSYSTEM=="usb", ACTION=="add", ATTRS{idVendor}=="054c", RUN+="/bin/bash /media/jetson/data/source/autobackup/script2.sh"

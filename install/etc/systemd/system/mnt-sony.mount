@@ -1,0 +1,9 @@
+[Unit]
+Description=Mount Sony device
+
+[Mount]
+What=/dev/disk/by-id/usb-Sony_DSC_CA21A03BA152-0:0-part1
+Where=/mnt/sony
+
+[Install]
+WantedBy=multi-user.target

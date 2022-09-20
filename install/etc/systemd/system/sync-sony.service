@@ -1,0 +1,12 @@
+[Unit]
+Description=Backup photos from sony device
+Requires=mnt-sony.mount
+After=mnt-sony.mount
+
+
+[Service]
+ExecStart=/media/jetson/data/source/autobackup/script2.sh
+
+
+[Install]
+WantedBy=mnt-sony.mount
