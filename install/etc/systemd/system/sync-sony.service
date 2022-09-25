@@ -3,10 +3,8 @@ Description=Backup photos from sony device
 Requires=mnt-sony.mount
 After=mnt-sony.mount
 
-
 [Service]
-ExecStart=/media/jetson/data/source/autobackup/script2.sh
-
+ExecStart=/media/jetson/data/source/autobackup/sync.sh
 
 [Install]
 WantedBy=mnt-sony.mount
