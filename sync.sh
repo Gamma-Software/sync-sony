@@ -36,6 +36,19 @@ done
 curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="Raw image conversion finished"
 
 
+curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="Raw image processing in progress"
+
+for VARIABLE in $(find $BACKUP_SOURCE/DCIM/* -name 'converted' -type d)
+do
+    echo $VARIABLE
+done
+
+# /Users/valentinrudloff/Documents/source/sync-sony/.venv/bin/python process_image.py 
+
+curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="Raw image processed"
+
+
+
 curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="Converted image send to NAS"
 # Then send converted images to NAS
 for VARIABLE in $(find $BACKUP_SOURCE/DCIM/*/converted -type d)

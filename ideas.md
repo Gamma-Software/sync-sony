@@ -1,0 +1,1 @@
+detect sensor dust and remove then
