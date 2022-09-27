@@ -1,5 +1,5 @@
 #!/bin/bash
-BACKUP_SOURCE="/media/jetson/sony_backup"
+BACKUP_SOURCE="/media/jetson/data/sony_backup"
 MOUNT_POINT="/mnt/sony/DCIM"
 
 #systemctl start mnt-sony.mount
@@ -38,12 +38,12 @@ curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8
 
 curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="Raw image processing in progress"
 
-for VARIABLE in $(find $BACKUP_SOURCE/DCIM/* -name 'converted' -type d)
+for VARIABLE in $(find $BACKUP_SOURCE/DCIM/* -name '*.dng')
 do
-    echo $VARIABLE
+    NAME=$(basename $VARIABLE)
+    DIR=$(dirname $VARIABLE)
+    time docker run -v $DIR:/images process_image python /app/process_image.py /images/$NAME 
 done
-
-# /Users/valentinrudloff/Documents/source/sync-sony/.venv/bin/python process_image.py 
 
 curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="Raw image processed"
 

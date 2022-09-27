@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import PIL.Image
 from PIL import ImageEnhance, ImageFilter, Image
 import rawpy

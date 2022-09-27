@@ -1,3 +1,2 @@
-lensfunpy
 Pillow
 rawpy

@@ -1,7 +1,9 @@
 
-BACKUP_SOURCE="/media/jetson/sony_backup"
+BACKUP_SOURCE="/media/jetson/data/sony_backup"
 
-for VARIABLE in $(find $BACKUP_SOURCE/DCIM/*/converted -type d)
+for VARIABLE in $(find $BACKUP_SOURCE/DCIM/* -name '*.dng')
 do
-    rsync -hvrPt --progress --ignore-existing $VARIABLE valentin@cergy-server.pival.lan:/mnt/backups/main_backup/nextcloud/data/photo_sync/valentin/sony/$(basename $(dirname $VARIABLE))
+    NAME=$(basename $VARIABLE)
+    DIR=$(dirname $VARIABLE)
+    time docker run -v $DIR:/images process_image python /app/process_image.py /images/$NAME 
 done
