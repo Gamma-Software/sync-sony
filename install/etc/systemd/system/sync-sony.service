@@ -1,6 +1,6 @@
 [Unit]
 Description=Backup photos from sony device
-Requires=mnt-sony.mount
+Wants=mnt-sony.mount
 After=mnt-sony.mount
 
 [Service]
