@@ -4,6 +4,11 @@ MOUNT_POINT="/mnt/sony/DCIM"
 
 START=$(date +%s)
 
+# avoid having parallel script running
+if ! systemctl is-active --quiet sync-sony.service; then
+    exit 1
+fi
+
 #systemctl start mnt-sony.mount
 if grep -qs '/mnt/sony ' /proc/mounts; then
     echo "It's mounted."
@@ -17,8 +22,8 @@ if grep -qs '/mnt/sony ' /proc/mounts; then
     /bin/systemctl stop mnt-sony.mount
 else
     echo "It's not mounted."
+    exit 2
 fi
-
 
 curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="Raw image conversion in progress"
 find $BACKUP_SOURCE/DCIM/* -name '*.ARW' | xargs -I{} docker run -v $BACKUP_SOURCE:$BACKUP_SOURCE raw2dng {}
