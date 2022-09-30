@@ -7,6 +7,7 @@ MOUNT_POINT="/mnt/sony/DCIM"
 import os
 import sys
 import time
+import shutil
 import subprocess
 
 
@@ -72,9 +73,17 @@ def convert_raw():
         start_time = time.time()
         send_notification("Raw image conversion in progress")
 
+        # convert raw to dng
         for f in filepath_to_convert:
-            print("convert " + f)
             os.system("docker run -v {}:{} raw2dng {}".format(BACKUP_SOURCE, BACKUP_SOURCE, f))
+
+            # check if the converted folder exists
+            converted_folder = f.replace(f.split("/")[-1], "converted")
+            if not os.path.isdir(converted_folder):
+                os.makedirs(converted_folder)
+            
+            # move the converted file to the converted folder
+            shutil.move(f.replace(".ARW", ".dng"), converted_folder)
 
         elapsed_time = int(time.time() - start_time)
         send_notification("Raw image conversion done in " + str(elapsed_time) + " seconds")
