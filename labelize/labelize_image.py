@@ -28,28 +28,23 @@ def detect(net, _image):
     return objects
 
 folder = sys.argv[1]
-described = True
+force = True if len(sys.argv) > 2 and sys.argv[2] == "True" else False
 
 images = find_images_in_folder(folder)
-if images:
+if len(images) > 0:
     net = jetson.inference.detectNet("ssd-mobilenet-v2", sys.argv, 0.5)
-
-for image in images:
-    print("Analysing: " + image)
-    with open(image, 'rb') as img_file:
-        img = Image(img_file)
-        # for desc in sorted(img.list_all()):
-        #     print(str(desc) + ": " + repr(img.get(desc)))
-        if 'image_description' in img.list_all():
-            if img.get("image_description").isspace():
-                described = False
-        else:
-            described = False
-
-    if not described:
-        detections = detect(net, image)
-        img.image_description = "{'object': "+repr(detections)+"}"
+    for image in images:
         described = True
-
-    with open(image, 'wb') as new_image_file:
-        new_image_file.write(img.get_file())
+        with open(image, 'rb') as img_file:
+            img = Image(img_file)
+            if 'image_description' in img.list_all():
+                if img.get("image_description").isspace():
+                    described = False
+            else:
+                described = False
+        if not described or force == True:
+            print("Analysing: " + image)
+            detections = detect(net, image)
+            img.image_description = "{'object': "+repr(detections)+"}"
+            with open(image, 'wb') as new_image_file:
+                new_image_file.write(img.get_file())
