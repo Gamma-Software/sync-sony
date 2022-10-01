@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 BACKUP_SOURCE="/media/jetson/data/sony_backup"
 MOUNT_POINT="/mnt/sony/DCIM"
@@ -14,7 +14,7 @@ import subprocess
 def send_notification(msg):
     chat_id="1282108405"
     url = "https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage"
-    os.system("curl -s -X POST "+ url + " -d chat_id="+chat_id+" -d text='"+msg+"'")
+    os.system("curl -s -X POST "+ url + " -d chat_id="+chat_id+" -d text='"+msg+"' > /dev/null")
 
 def filter_files_in_subfolders(path, ext):
     files = []
@@ -30,10 +30,12 @@ def find_file_in_subfolders(path, filename, ext):
         if filename in filenames:
             return os.path.join(root, filename+ext)
 
-def find_folder_in_subfolders(path, foldername):
+def find_folders_in_subfolders(path, foldername):
+    folders = []
     for root, dirs, filenames in os.walk(path):
         if foldername in dirs:
-            return os.path.join(root, foldername)
+            folders.append(os.path.join(root, foldername))
+    return folders
 
 def backup_camera():
     print("---- Step: backup camera")
@@ -49,6 +51,7 @@ def backup_camera():
         start_time = time.time()
 
         os.system("rsync -hvrPt --progress --ignore-existing "+MOUNT_POINT+" "+BACKUP_SOURCE)
+        os.chown(BACKUP_SOURCE, 1000, 1000)
 
         elapsed_time = int(time.time() - start_time)
         send_notification("Backup sony raw done in " + str(elapsed_time) + " seconds")
@@ -80,6 +83,7 @@ def convert_raw():
 
         # convert raw to dng
         for f in filepath_to_convert:
+            print("    converting {}".format(f))
             os.system("docker run -v {}:{} raw2dng {}".format(BACKUP_SOURCE, BACKUP_SOURCE, f))
 
             # check if the converted folder exists
@@ -115,40 +119,60 @@ def process_image():
 
         for f in filepath_to_convert:
             # Create the output folder
-            output_folder = f.replace(f.split("/")[-1], "processed")
+            output_folder = f.replace(f.split("/")[-1], "converted")
             if not os.path.isdir(output_folder):
                 os.makedirs(output_folder)
-            dirname = os.path.dirname(f)
             filename = os.path.basename(f)
-            os.system("docker run -v {}:/images process_image python /app/process_image.py /images/{} /images/processed/{}".format(dirname, filename, filename))
+            print("    processing {}".format(filename))
+            os.system("docker run -v {}:/images process_image python /app/process_image.py /images/{} /images/processed/{}".format(output_folder, filename, filename))
 
         elapsed_time = int(time.time() - start_time)
         send_notification("Raw image processed in " + str(elapsed_time) + " seconds")
 
-def labelize_images():
+def labelize_images(force=False):
     print("---- Step: labelize image")
     
     #  find converted folder in backup source
-    converted_folders = find_folder_in_subfolders(BACKUP_SOURCE, "converted")
+    processed_folders = find_folders_in_subfolders(BACKUP_SOURCE, "processed")
 
-    if len(converted_folders) > 0:
+    if len(processed_folders) > 0:
         # mesure time
         start_time = time.time()
         send_notification("Image description in progress")
 
-        for converted_folder in converted_folders:
-            os.system("docker run --runtime nvidia -it --rm --network host -v /tmp/.X11-unix/:/tmp/.X11-unix -v /tmp/argus_socket:/tmp/argus_socket -v /etc/enctune.conf:/etc/enctune.conf --device /dev/video0 --volume /media/jetson/data/source/jetson-inference/data:/jetson-inference/data --volume /media/jetson/data/source/jetson-inference/python/training/classification/data:/jetson-inference/python/training/classification/data -v /media/jetson/data/source/jetson-inference/python/training/classification/models:/jetson-inference/python/training/classification/models -v /media/jetson/data/source/jetson-inference/python/training/detection/ssd/data:/jetson-inference/python/training/detection/ssd/data -v /media/jetson/data/source/jetson-inference/python/training/detection/ssd/models:/jetson-inference/python/training/detection/ssd/models -v {}:/image labelize python3 /app/labelize_image.py /image".format(converted_folder))
+        for processed_folder in processed_folders:
+            print("    labelize files in {}".format(processed_folder))
+            os.system("docker run --runtime nvidia -it --rm --network host -v /tmp/.X11-unix/:/tmp/.X11-unix -v /tmp/argus_socket:/tmp/argus_socket -v /etc/enctune.conf:/etc/enctune.conf --device /dev/video0 --volume /media/jetson/data/source/jetson-inference/data:/jetson-inference/data --volume /media/jetson/data/source/jetson-inference/python/training/classification/data:/jetson-inference/python/training/classification/data -v /media/jetson/data/source/jetson-inference/python/training/classification/models:/jetson-inference/python/training/classification/models -v /media/jetson/data/source/jetson-inference/python/training/detection/ssd/data:/jetson-inference/python/training/detection/ssd/data -v /media/jetson/data/source/jetson-inference/python/training/detection/ssd/models:/jetson-inference/python/training/detection/ssd/models -v {}:/image labelize python3 /app/labelize_image.py /image {}".format(processed_folder, force))
 
         elapsed_time = int(time.time() - start_time)
         send_notification("Image description done " + str(elapsed_time) + " seconds")
 
 def send_to_nas():
     print("---- Step: send to nas")
-    return
+    
+    #  find converted folder in backup source
+    converted_folders = find_folders_in_subfolders(BACKUP_SOURCE, "processed")
 
-# backup_camera()
-# convert_raw()
-# process_image()
+    if len(converted_folders) > 0:
+        # Then send converted images to NAS
+        for converted_folder in converted_folders:
+            # Get the files not present on NAS
+            files_to_send = os.popen("rsync -vrn --out-format=FILEDETAIL::%n /media/jetson/data/sony_backup/DCIM/101MSDCF/converted/processed valentin@cergy-server.pival.lan:/mnt/backups/main_backup/nextcloud/data/photo_sync/valentin/sony/101MSDCF | grep '^FILEDETAIL'")
+            if len(list(files_to_send)) > 0:
+                # mesure time
+                start_time = time.time()
+                send_notification("Send to nas progress")
+                print("    sending: " + repr(list(files_to_send)))
+                foldername = converted_folder.split("/")[-3]
+                os.system("rsync -hvrPt --progress " + converted_folder + " valentin@cergy-server.pival.lan:/mnt/backups/main_backup/nextcloud/data/photo_sync/valentin/sony/"+foldername)
+        
+                elapsed_time = int(time.time() - start_time)
+                send_notification("Send to nas done " + str(elapsed_time) + " seconds")
+
+
+backup_camera()
+convert_raw()
+process_image()
 labelize_images()
-# send_to_nas()
+send_to_nas()
 
