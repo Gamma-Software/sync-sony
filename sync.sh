@@ -6,6 +6,7 @@ START=$(date +%s)
 
 # avoid having parallel script running
 if ! systemctl is-active --quiet sync-sony.service; then
+    echo "script is already in progress"
     exit 1
 fi
 
@@ -21,11 +22,15 @@ if grep -qs '/mnt/sony ' /proc/mounts; then
     curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="You can unplug your Camera"
     /bin/systemctl stop mnt-sony.mount
 else
-    echo "It's not mounted."
-    exit 2
+    echo "The camera is not mounted"
 fi
 
 curl -s -X POST https://api.telegram.org/bot5073177948:AAEDeDL7Bi9J-5wYvkXHHQ5_8TiuBybWjFQ/sendMessage -d chat_id=1282108405 -d text="Raw image conversion in progress"
+
+# get images not converted yet
+RAW_IMAGES=$(find $BACKUP_SOURCE -type f -name "*.ARW" -not -name "*converted*")
+
+
 find $BACKUP_SOURCE/DCIM/* -name '*.ARW' | xargs -I{} docker run -v $BACKUP_SOURCE:$BACKUP_SOURCE raw2dng {}
 
 # Create the folder converted to the root of the image folder
