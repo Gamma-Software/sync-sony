@@ -4,7 +4,7 @@ Wants=mnt-sony.mount
 After=mnt-sony.mount
 
 [Service]
-ExecStart=/media/jetson/data/source/autobackup/sync.py
+ExecStart=/media/jetson/data/source/autobackup/source/main.py
 
 [Install]
 WantedBy=mnt-sony.mount

@@ -135,17 +135,29 @@ def labelize_images(force=False):
     #  find converted folder in backup source
     processed_folders = find_folders_in_subfolders(BACKUP_SOURCE, "processed")
 
-    if len(processed_folders) > 0:
-        # mesure time
-        start_time = time.time()
-        send_notification("Image description in progress")
+    for processed_folder in processed_folders:        
+        # Reset the file list if force is True
+        if len(sys.argv) > 1 and sys.argv[1] == "True" and os.path.exists(os.path.join(processed_folder, "labelized.txt")):
+            os.remove(os.path.join(processed_folder, "labelized.txt"))
+        
+        # Get the list of images already labeled
+        with open(os.path.join(processed_folder, "labelized.txt"), "r+") as labelized:
+            images_already_labelized = labelized.read().splitlines()
+            
+        images_in_folder = filter_files_in_subfolders(processed_folder, ".jpg")
+        images_in_folder = [f.split("/")[-1] for f in images_in_folder]
 
-        for processed_folder in processed_folders:
-            print("    labelize files in {}".format(processed_folder))
-            os.system("docker run --runtime nvidia -it --rm --network host -v /tmp/.X11-unix/:/tmp/.X11-unix -v /tmp/argus_socket:/tmp/argus_socket -v /etc/enctune.conf:/etc/enctune.conf --device /dev/video0 --volume /media/jetson/data/source/jetson-inference/data:/jetson-inference/data --volume /media/jetson/data/source/jetson-inference/python/training/classification/data:/jetson-inference/python/training/classification/data -v /media/jetson/data/source/jetson-inference/python/training/classification/models:/jetson-inference/python/training/classification/models -v /media/jetson/data/source/jetson-inference/python/training/detection/ssd/data:/jetson-inference/python/training/detection/ssd/data -v /media/jetson/data/source/jetson-inference/python/training/detection/ssd/models:/jetson-inference/python/training/detection/ssd/models -v {}:/image labelize python3 /app/labelize_image.py /image {}".format(processed_folder, force))
+        # get the list of images to labelize
+        images_to_labelize = list(set(images_in_folder) - set(images_already_labelized))
+        
+        if len(images_to_labelize) > 0:
+            start_time = time.time()
+            send_notification("Image description in progress")
+            
+            os.system("docker run --runtime nvidia -it --rm --network host -v /tmp/.X11-unix/:/tmp/.X11-unix -v /tmp/argus_socket:/tmp/argus_socket -v /etc/enctune.conf:/etc/enctune.conf --device /dev/video0 --volume /media/jetson/data/source/jetson-inference/data:/jetson-inference/data --volume /media/jetson/data/source/jetson-inference/python/training/classification/data:/jetson-inference/python/training/classification/data -v /media/jetson/data/source/jetson-inference/python/training/classification/models:/jetson-inference/python/training/classification/models -v /media/jetson/data/source/jetson-inference/python/training/detection/ssd/data:/jetson-inference/python/training/detection/ssd/data -v /media/jetson/data/source/jetson-inference/python/training/detection/ssd/models:/jetson-inference/python/training/detection/ssd/models -v {}:/image labelize python3 /app/labelize_image.py /image".format(processed_folder))
 
-        elapsed_time = int(time.time() - start_time)
-        send_notification("Image description done " + str(elapsed_time) + " seconds")
+            elapsed_time = int(time.time() - start_time)
+            send_notification("Image description done " + str(elapsed_time) + " seconds")
 
 def send_to_nas():
     print("---- Step: send to nas")
