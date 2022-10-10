@@ -1,21 +1,59 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import PIL.Image
-from PIL import ImageEnhance, ImageFilter, Image
-import rawpy
 import sys
+import cv2
+from pilgram import css
+from pilgram import util
 
-file = sys.argv[1]
-output_file = sys.argv[2]
-img = Image.open(file)
-with rawpy.imread(file) as raw:
-    rgb = raw.postprocess(use_camera_wb=True)
+def normalize(image):
+    return cv2.normalize(image, None, 25, 255, cv2.NORM_MINMAX)
 
-image = PIL.Image.fromarray(rgb)
-sharpen = image.filter(ImageFilter.SHARPEN)
-applier = ImageEnhance.Contrast(sharpen)
-img = applier.enhance(0.9)
-filter = ImageEnhance.Sharpness(img)
-img = filter.enhance(2)
-filter = ImageEnhance.Color(img)
-img = filter.enhance(0.9)
-img.save(output_file.replace("dng", "jpg"), quality=90, subsampling=0)
+def black_white_process(image):
+    cb = util.or_convert(image, 'RGB')
+
+    cs1 = util.radial_gradient(
+            cb.size,
+            [(212, 169, 175), (0, 0, 0)],
+            [.55, 1.5])
+    cm1 = css.blending.overlay(cb, cs1)
+
+    cs2 = util.fill(cb.size, [216, 205, 203])
+    cr = css.blending.color(cm1, cs2)
+
+    cr = css.grayscale(cr, .5)
+    cr = css.contrast(cr, .8)
+    cr = css.brightness(cr, .9)
+    return cr
+
+def color_process(image):
+    cb = util.or_convert(image, 'RGB')
+
+    cs1 = util.fill(cb.size, [236, 205, 169, .15])
+    cm1 = css.blending.multiply(cb, cs1)
+
+    cs2 = util.fill(cb.size, [50, 30, 7, .4])
+    cm2 = css.blending.multiply(cb, cs2)
+
+    gradient_mask1 = util.radial_gradient_mask(cb.size, length=.55)
+    cm = PIL.Image.composite(cm1, cm2, gradient_mask1)
+
+    cs3 = util.fill(cb.size, [232, 197, 152, .8])
+    cm3 = css.blending.overlay(cm, cs3)
+
+    gradient_mask2 = util.radial_gradient_mask(cb.size, scale=.9)
+    cm_ = PIL.Image.composite(cm3, cm, gradient_mask2)
+    cr = PIL.Image.blend(cm, cm_, .6)  # opacity
+
+    cr = css.brightness(cr, 1.05)
+    cr = css.sepia(cr, .2)
+    cr = css.contrast(cr, .9)
+    cr = css.saturate(cr, .9)
+    return cr
+
+input_file = sys.argv[1]
+image = cv2.imread(input_file)
+image_norm = cv2.normalize(image, None, 25, 255, cv2.NORM_MINMAX)
+img = cv2.cvtColor(image_norm, cv2.COLOR_BGR2RGB)
+im_pil = PIL.Image.fromarray(img)
+black_white_process(im_pil).save(input_file.replace('.jpg', '_processed_bw.jpg'))
+color_process(im_pil).save(input_file.replace('.jpg', '_processed_color.jpg'))
