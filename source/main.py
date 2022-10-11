@@ -8,7 +8,7 @@ import os
 import sys
 import time
 import shutil
-import subprocess
+from process.process_image import *
 
 
 def send_notification(msg):
@@ -20,7 +20,7 @@ def filter_files_in_subfolders(path, ext):
     files = []
     for root, dirs, filenames in os.walk(path):
         for f in filenames:
-            if f.endswith(ext):
+            if any(f.endswith(e) for e in ext):
                 files.append(os.path.join(root, f))
     return files
 
@@ -50,7 +50,7 @@ def backup_camera():
         # mesure time
         start_time = time.time()
 
-        os.system("rsync -hvrPt --progress --ignore-existing "+MOUNT_POINT+" "+BACKUP_SOURCE)
+        os.system("rsync -hvrPt --progress --remove-source-files --ignore-existing "+MOUNT_POINT+" "+BACKUP_SOURCE)
         os.chown(BACKUP_SOURCE, 1000, 1000)
 
         elapsed_time = int(time.time() - start_time)
@@ -76,16 +76,18 @@ def convert_raw():
     to_convert = list(set(raw_files) - set(converted_files))
     filepath_to_convert = [find_file_in_subfolders(BACKUP_SOURCE, f, ".ARW") for f in to_convert]
 
+    #  Convert the dng
     if len(filepath_to_convert) > 0:
         # mesure time
         start_time = time.time()
-        send_notification("Raw image conversion in progress")
+        send_notification("Raw image conversion ARW to DNG in progress")
 
         # convert raw to dng
         for f in filepath_to_convert:
             print("    converting {}".format(f))
+            
+            # Convert arw to dng
             os.system("docker run -v {}:{} raw2dng {}".format(BACKUP_SOURCE, BACKUP_SOURCE, f))
-
             # check if the converted folder exists
             converted_folder = f.replace(f.split("/")[-1], "converted")
             if not os.path.isdir(converted_folder):
@@ -93,9 +95,41 @@ def convert_raw():
             
             # move the converted file to the converted folder
             shutil.move(f.replace(".ARW", ".dng"), converted_folder)
+            
+        elapsed_time = int(time.time() - start_time)
+        send_notification("Raw image conversion ARW to DNG done in " + str(elapsed_time) + " seconds")
+    
+    # get the list of converted jpg files
+    converted_files_jpg = filter_files_in_subfolders(BACKUP_SOURCE, [".jpg", ".JPG"])
+    converted_files_jpg = [os.path.splitext(os.path.basename(f))[0] for f in converted_files_jpg]
+    
+    # get the list of files to convert
+    to_convert = list(set(raw_files) - set(converted_files_jpg))
+    filepath_to_convert = [find_file_in_subfolders(BACKUP_SOURCE, f, ".ARW") for f in to_convert]
+    
+    if len(filepath_to_convert) > 0:
+        # mesure time
+        start_time = time.time()
+        send_notification("Raw image conversion ARW to JPG in progress")
+
+        # convert raw to dng
+        for f in filepath_to_convert:
+            print("    converting {}".format(f))
+            
+            # Convert dng to jpg
+            os.system("docker run -v {}:{} convert_to_jpg {}".format(BACKUP_SOURCE, BACKUP_SOURCE, f.replace(".ARW", ".dng")))
+
+            # check if the converted folder exists
+            converted_folder = f.replace(f.split("/")[-1], "converted")
+            if not os.path.isdir(converted_folder):
+                os.makedirs(converted_folder)
+            
+            # move the converted file to the converted folder
+            shutil.move(f.replace(".ARW", ".jpg"), converted_folder)
 
         elapsed_time = int(time.time() - start_time)
-        send_notification("Raw image conversion done in " + str(elapsed_time) + " seconds")
+        send_notification("Raw image conversion ARW to JPG done in " + str(elapsed_time) + " seconds")
+
 
 def process_image():
     print("---- Step: process image")
@@ -109,22 +143,30 @@ def process_image():
     
     # get the list of files to convert
     to_process = list(set(raw_converted_files) - set(processed_files))
-    filepath_to_convert = [find_file_in_subfolders(BACKUP_SOURCE, f, ".dng") for f in to_process]
+    filepath_to_process = [find_file_in_subfolders(BACKUP_SOURCE, f, ".dng") for f in to_process]
 
     # process raw
-    if len(filepath_to_convert) > 0:
+    if len(filepath_to_process) > 0:
         # mesure time
         start_time = time.time()
         send_notification("Raw image processing in progress")
 
-        for f in filepath_to_convert:
+        for f in filepath_to_process:
+            input_filename = os.path.basename(f)
+            output_path = os.path.join(os.path.dirname(f), "converted")
+            
             # Create the output folder
             output_folder = f.replace(f.split("/")[-1], "converted")
             if not os.path.isdir(output_folder):
                 os.makedirs(output_folder)
-            filename = os.path.basename(f)
-            print("    processing {}".format(filename))
-            os.system("docker run -v {}:/images process_image python /app/process_image.py /images/{} /images/processed/{}".format(output_folder, filename, filename))
+            image = cv2.imread(f)
+            
+            # Process the image
+            image_norm = cv2.normalize(image, None, 25, 255, cv2.NORM_MINMAX)
+            img = cv2.cvtColor(image_norm, cv2.COLOR_BGR2RGB)
+            im_pil = PIL.Image.fromarray(img)
+            black_white_process(im_pil).save(os.path.join(output_path, input_filename.replace('.jpg', '_bw.jpg')))
+            color_process(im_pil).save(os.path.join(output_path, input_filename.replace('.jpg', '_color.jpg')))
 
         elapsed_time = int(time.time() - start_time)
         send_notification("Raw image processed in " + str(elapsed_time) + " seconds")
@@ -144,7 +186,7 @@ def labelize_images(force=False):
         with open(os.path.join(processed_folder, "labelized.txt"), "r+") as labelized:
             images_already_labelized = labelized.read().splitlines()
             
-        images_in_folder = filter_files_in_subfolders(processed_folder, ".jpg")
+        images_in_folder = filter_files_in_subfolders(processed_folder, "_color.jpg")
         images_in_folder = [f.split("/")[-1] for f in images_in_folder]
 
         # get the list of images to labelize
@@ -182,9 +224,9 @@ def send_to_nas():
                 send_notification("Send to nas done " + str(elapsed_time) + " seconds")
 
 
-backup_camera()
+# backup_camera()
 convert_raw()
-process_image()
-labelize_images()
-send_to_nas()
+# process_image()
+# labelize_images()
+# send_to_nas()
 

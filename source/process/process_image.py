@@ -49,11 +49,3 @@ def color_process(image):
     cr = css.contrast(cr, .9)
     cr = css.saturate(cr, .9)
     return cr
-
-input_file = sys.argv[1]
-image = cv2.imread(input_file)
-image_norm = cv2.normalize(image, None, 25, 255, cv2.NORM_MINMAX)
-img = cv2.cvtColor(image_norm, cv2.COLOR_BGR2RGB)
-im_pil = PIL.Image.fromarray(img)
-black_white_process(im_pil).save(input_file.replace('.jpg', '_processed_bw.jpg'))
-color_process(im_pil).save(input_file.replace('.jpg', '_processed_color.jpg'))
