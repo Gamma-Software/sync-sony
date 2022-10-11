@@ -36,7 +36,7 @@ processed_folder = sys.argv[1]
 with open(os.path.join(processed_folder, "labelized.txt"), "r") as labelized:
     images_already_labelized = labelized.read().splitlines()
     # images_already_labelized = [f.split("/")[-1] for f in images_already_labelized]
-images_in_folder = filter_files_in_subfolders(processed_folder, ".jpg")
+images_in_folder = filter_files_in_subfolders(processed_folder, "_color.jpg")
 
 # get the list of images to labelize
 images_to_labelize = list(set(images_in_folder) - set(images_already_labelized))
@@ -51,7 +51,9 @@ if len(images_to_labelize) > 0:
         print("Analysing: " + os.path.join(processed_folder, image))
         detections = detect(net, os.path.join(processed_folder, image))
         img.image_description = "{'object': "+repr(detections)+"}"
-        with open(os.path.join(processed_folder, image), 'wb') as new_image_file:
-            new_image_file.write(img.get_file())
+        with open(os.path.join(processed_folder, image), 'wb') as color_image:
+            color_image.write(img.get_file())
+        with open(os.path.join(processed_folder, image.replace("_color.jpg", "_bw.jpg") ), 'wb') as bw_image:
+            bw_image.write(img.get_file())
         with open(os.path.join(processed_folder, "labelized.txt"), "a") as labelized:
             labelized.write(image+"\n")
