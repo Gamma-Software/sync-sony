@@ -2,6 +2,7 @@
 import PIL.Image
 import sys
 import cv2
+import os
 from pilgram import css
 from pilgram import util
 
@@ -23,6 +24,7 @@ def black_white_process(image):
     cr = css.grayscale(cr, .5)
     cr = css.contrast(cr, .8)
     cr = css.brightness(cr, .9)
+    
     return cr
 
 def color_process(image):
@@ -49,3 +51,13 @@ def color_process(image):
     cr = css.contrast(cr, .9)
     cr = css.saturate(cr, .9)
     return cr
+
+if __name__ == '__main__':
+    output_path = os.path.dirname(sys.argv[1])
+    input_filename = os.path.basename(sys.argv[1])
+    
+    im = PIL.Image.open(sys.argv[1])
+    print("    generate bw")
+    black_white_process(im).save(os.path.join(output_path, input_filename.replace('.jpg', '_bw.jpg')))
+    print("    generate color")
+    color_process(im).save(os.path.join(output_path, input_filename.replace('.jpg', '_color.jpg')))
